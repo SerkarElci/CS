@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IB DP CS — Option C · C.1.9 Protocols & Standards</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121935;
+      --panel-2: #18234d;
+      --text: #e8ecff;
+      --muted: #b9c2ff;
+      --accent: #6ea8fe;
+      --accent-2: #86ffd3;
+      --danger: #ff6b6b;
+      --success: #58d68d;
+      --border: #273266;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 10% 0%, #0f194a 0%, #0b1020 50%, #0b1020 100%);
+      color:var(--text); line-height:1.6;
+    }
+    header{
+      position:sticky; top:0; z-index:50; backdrop-filter:saturate(140%) blur(10px);
+      background: linear-gradient(90deg, rgba(14,23,55,.9), rgba(11,16,32,.9));
+      border-bottom:1px solid var(--border);
+    }
+    .wrap{max-width:1100px; margin:0 auto; padding: clamp(14px, 2vw, 22px);}    
+    .brand{display:flex;align-items:center;gap:12px}
+    .logo{
+      width:36px;height:36px;border-radius:12px; background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: var(--shadow);
+    }
+    h1{font-size: clamp(22px, 3vw, 30px); margin:0}
+    nav{
+      display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;
+    }
+    nav a{
+      text-decoration:none; color:var(--text); padding:8px 12px; border:1px solid var(--border);
+      border-radius:12px; background:rgba(255,255,255,.04);
+      transition:.2s ease; font-size:14px
+    }
+    nav a:hover{transform:translateY(-1px); background:rgba(255,255,255,.08)}
+
+    main{padding: 28px 0 64px}
+    section{background: linear-gradient(180deg, rgba(24,35,77,.55), rgba(24,35,77,.3));
+      border:1px solid var(--border); border-radius: var(--radius); padding:28px; margin:18px 0; box-shadow: var(--shadow);
+    }
+    section h2{margin-top:0}
+    .grid{display:grid; gap:18px}
+    @media (min-width: 900px){ .grid{grid-template-columns: 1.2fr 1fr}}
+
+    .card{background: linear-gradient(180deg, rgba(19,28,59,.45), rgba(19,28,59,.2)); border:1px solid var(--border); border-radius:14px; padding:18px}
+
+    .muted{color:var(--muted)}
+    .kbd{border:1px solid var(--border); padding:2px 8px; border-radius:10px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background:rgba(255,255,255,.04);}
+
+    table{width:100%; border-collapse:collapse; overflow:hidden; border-radius:12px;}
+    th, td{border:1px solid var(--border); padding:10px 12px; vertical-align:top}
+    th{background:rgba(255,255,255,.06); text-align:left}
+    tr:nth-child(odd) td{background:rgba(255,255,255,.03)}
+
+    .pill{display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; font-size:12px; background:rgba(255,255,255,.08); border:1px solid var(--border)}
+    .pill.success{background:rgba(88,214,141,.15); color:#c8f5df; border-color:#2c7a55}
+    .pill.warn{background:rgba(255,107,107,.12); color:#ffd3d3; border-color:#6b2c2c}
+
+    .quiz{display:grid; gap:14px}
+    .q-item{border:1px solid var(--border); border-radius:14px; padding:16px; background:rgba(255,255,255,.04)}
+    .q-title{font-weight:600}
+    .choices{display:grid; gap:10px; margin-top:10px}
+    .choice{display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--border); border-radius:12px; cursor:pointer; background:rgba(255,255,255,.03)}
+    .choice input{margin-top:3px}
+    .choice:hover{background:rgba(255,255,255,.06)}
+    .feedback{margin-top:10px; font-size:.95rem}
+    .feedback.correct{color: var(--success)}
+    .feedback.incorrect{color: var(--danger)}
+    .actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px}
+    button{appearance:none; border:none; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color:#0a0f20; padding:10px 14px; border-radius:12px; font-weight:700; cursor:pointer; box-shadow: var(--shadow)}
+    button.secondary{background:rgba(255,255,255,.08); color:var(--text); border:1px solid var(--border)}
+    button:disabled{opacity:.6; cursor:not-allowed}
+
+    .footer{opacity:.8; font-size:.9rem; margin-top:18px}
+    .tag{display:inline-block; padding:3px 8px; border:1px solid var(--border); border-radius:999px; font-size:12px; margin-right:6px}
+
+    .toc{
+      display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 0
+    }
+    .toc a{font-size:13px; opacity:.9}
+
+    .callout{border:1px dashed var(--border); border-radius:12px; padding:12px; background:rgba(255,255,255,.03)}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <h1>Option C — C.1.9 · Protocols & Standards</h1>
+          <div class="toc">
+            <a href="#definitions" class="pill">Definitions</a>
+            <a href="#importance" class="pill">Why they matter</a>
+            <a href="#examples" class="pill">Examples & Layers</a>
+            <a href="#orgs" class="pill">Standards bodies</a>
+            <a href="#exam" class="pill">IB exam guidance</a>
+            <a href="#practice" class="pill success">Practice</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="definitions" aria-labelledby="h-defs">
+      <h2 id="h-defs">What are protocols and standards?</h2>
+      <div class="grid">
+        <div class="card">
+          <p><strong>Protocol</strong>: the formal rules for how devices communicate — message structure, order, error handling (e.g., <span class="kbd">HTTP</span>, <span class="kbd">TCP</span>, <span class="kbd">IP</span>).</p>
+          <p><strong>Standard</strong>: a published specification (e.g., HTML, CSS, Unicode) ensuring that different vendors implement technology in a compatible way.</p>
+          <div class="callout">Protocols are the <em>rules of communication</em>; standards are the <em>agreements to implement those rules consistently</em>.</div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">Key outcomes</h3>
+          <ul>
+            <li>Interoperability across browsers, servers, and networks</li>
+            <li>Reliable delivery and integrity of data</li>
+            <li>Security (encryption & authentication)</li>
+            <li>Scalability, portability & accessibility</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="importance" aria-labelledby="h-importance">
+      <h2 id="h-importance">Why protocols & standards matter</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>1) Interoperability</h3>
+          <p>Common protocols (HTTP/TCP/IP) and standards (HTML/CSS/JS) allow any compliant browser to render any compliant site.</p>
+        </div>
+        <div class="card">
+          <h3>2) Reliability & Integrity</h3>
+          <p><span class="kbd">TCP</span> handles acknowledgements, retransmission, and ordering so pages and files arrive complete.</p>
+        </div>
+        <div class="card">
+          <h3>3) Security & Trust</h3>
+          <p><span class="kbd">HTTPS</span> (HTTP over TLS) standardizes encryption and server authentication for safe logins and payments.</p>
+        </div>
+        <div class="card">
+          <h3>4) Scalability & Performance</h3>
+          <p>CDNs, proxies, and caches rely on shared HTTP semantics and headers to optimize delivery worldwide.</p>
+        </div>
+        <div class="card">
+          <h3>5) Portability & Compatibility</h3>
+          <p>HTML/CSS separate content from presentation, enabling content to work on desktop, mobile, and assistive tech.</p>
+        </div>
+        <div class="card">
+          <h3>6) Accessibility & Internationalization</h3>
+          <p>Semantic HTML and UTF‑8 ensure content is usable by screen readers and displays correctly in many languages.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="examples" aria-labelledby="h-ex">
+      <h2 id="h-ex">Examples & layers</h2>
+      <table role="table" aria-label="Examples by layer">
+        <thead>
+          <tr><th>Layer</th><th>Example</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Application</td><td>HTTP / HTTPS</td><td>Defines request/response patterns; with TLS adds encryption & authentication</td></tr>
+          <tr><td>Transport</td><td>TCP</td><td>Reliable, ordered delivery and flow control</td></tr>
+          <tr><td>Internet</td><td>IP</td><td>Addressing and routing of packets</td></tr>
+          <tr><td>Web content</td><td>HTML / CSS / JavaScript</td><td>Structure, presentation, interactivity</td></tr>
+          <tr><td>Addressing</td><td>URL / URI</td><td>Uniform way to locate and identify resources</td></tr>
+          <tr><td>Security</td><td>TLS / SSL</td><td>Encrypts and authenticates client–server communication</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="orgs" aria-labelledby="h-orgs">
+      <h2 id="h-orgs">Who sets and maintains them?</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>IETF</h3>
+          <p>Publishes protocol RFCs like TCP/IP and HTTP; open, consensus-driven engineering process.</p>
+        </div>
+        <div class="card">
+          <h3>W3C & WHATWG</h3>
+          <p>Define and maintain the web platform (HTML, CSS, DOM, accessibility). WHATWG maintains the HTML Living Standard.</p>
+        </div>
+        <div class="card">
+          <h3>ISO & others</h3>
+          <p>Broader technical standards that influence ICT quality, safety, and interoperability worldwide.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="exam" aria-labelledby="h-exam">
+      <h2 id="h-exam">IB exam guidance</h2>
+      <p><strong>Command term:</strong> <em>Explain</em> — give a detailed account with reasons/causes. Connect <em>what</em> a protocol/standard does to <em>why</em> it matters (interoperability, security, reliability, accessibility).</p>
+      <div class="callout">
+        Model sentence: “Protocols and standards ensure that diverse systems interoperate using a common, published ‘language’. For example, HTTP defines how clients and servers exchange requests and responses, while TCP ensures reliable delivery and TLS provides security. This shared foundation lets any standards‑compliant browser load any standards‑compliant site securely and reliably.”
+      </div>
+    </section>
+
+    <section id="practice" aria-labelledby="h-practice">
+      <h2 id="h-practice">Practice questions</h2>
+      <p class="muted">Answer each multiple‑choice question. You’ll see immediate feedback explaining why the option is correct (or what to review).</p>
+      <div id="quiz" class="quiz" aria-live="polite"></div>
+      <div class="actions">
+        <button id="submitAll">Submit all</button>
+        <button id="reset" class="secondary">Reset</button>
+        <span id="scoreBadge" class="pill" aria-live="polite" style="display:none"></span>
+      </div>
+      <div class="footer">Tip: Re‑read the sections above if you miss one — each answer is anchored in the lesson content.</div>
+    </section>
+  </main>
+
+  <script>
+    // ------- Quiz Data -------
+    const QUESTIONS = [
+      {
+        title: "Which statement best distinguishes protocols from standards on the web?",
+        choices: [
+          "Protocols are hardware devices; standards are software programs.",
+          "Protocols define how systems communicate; standards ensure consistent implementation across vendors.",
+          "Protocols are only for security; standards are only for performance.",
+          "Protocols are optional guidelines; standards are laws."
+        ],
+        correct: 1,
+        explain: [
+          "Incorrect. Protocols and standards are specifications, not physical devices or programs.",
+          "Correct. Protocols specify communication rules; standards are published specs that promote interoperability.",
+          "Incorrect. Protocols cover many areas (format, order, errors). Standards are not limited to performance.",
+          "Incorrect. Neither are laws; adoption is voluntary but essential for compatibility."
+        ]
+      },
+      {
+        title: "Which protocol primarily guarantees ordered and reliable delivery of data for web pages?",
+        choices: ["IP", "TCP", "HTTP", "TLS"],
+        correct: 1,
+        explain: [
+          "Incorrect. IP handles addressing and routing but not reliability.",
+          "Correct. TCP provides acknowledgements, retransmission, and flow control.",
+          "Incorrect. HTTP is an application protocol using TCP.",
+          "Incorrect. TLS provides encryption and authentication, not delivery guarantees."
+        ]
+      },
+      {
+        title: "HTTPS adds which key properties to HTTP?",
+        choices: [
+          "Compression and caching",
+          "Encryption and server authentication",
+          "Routing and addressing",
+          "File storage on the server"
+        ],
+        correct: 1,
+        explain: [
+          "Incorrect. Compression/caching may occur but are not what HTTPS adds.",
+          "Correct. HTTPS = HTTP over TLS for confidentiality and authenticity.",
+          "Incorrect. Those are IP’s responsibilities.",
+          "Incorrect. That’s unrelated to the protocol difference."
+        ]
+      },
+      {
+        title: "Who maintains the HTML Living Standard?",
+        choices: ["IETF", "W3C", "WHATWG", "ISO"],
+        correct: 2,
+        explain: [
+          "Incorrect. IETF focuses on Internet protocols (TCP/IP, HTTP).",
+          "Partially true historically, but the Living Standard is maintained by WHATWG.",
+          "Correct. WHATWG stewards the HTML Living Standard.",
+          "Incorrect. ISO sets broader international standards, not HTML."
+        ]
+      },
+      {
+        title: "Why are common web standards crucial for portability?",
+        choices: [
+          "They ensure pages render across devices and assistive technologies without site‑specific code.",
+          "They allow browsers to ignore accessibility features.",
+          "They eliminate the need for security entirely.",
+          "They restrict innovation so all browsers work the same."
+        ],
+        correct: 0,
+        explain: [
+          "Correct. Shared HTML/CSS/JS semantics support cross‑device compatibility and accessibility.",
+          "Incorrect. Standards encourage accessibility, not ignoring it.",
+          "Incorrect. Security remains essential; standards define how it’s implemented.",
+          "Incorrect. Standards enable innovation while preserving interoperability."
+        ]
+      },
+      {
+        title: "Which item is a \"protocol\" rather than a \"content standard\"?",
+        choices: ["CSS", "HTTP", "HTML", "Unicode"],
+        correct: 1,
+        explain: [
+          "Incorrect. CSS is a presentation standard.",
+          "Correct. HTTP is an application‑layer protocol.",
+          "Incorrect. HTML is a markup standard.",
+          "Incorrect. Unicode standardizes character encoding."
+        ]
+      },
+      {
+        title: "What is the primary role of URLs/URIs on the web?",
+        choices: [
+          "To guarantee packet delivery",
+          "To encrypt application data",
+          "To uniformly identify and locate resources",
+          "To generate server‑side HTML"
+        ],
+        correct: 2,
+        explain: [
+          "Incorrect. Delivery is handled by TCP.",
+          "Incorrect. Encryption is provided by TLS in HTTPS.",
+          "Correct. URLs/URIs provide a standardized way to identify and fetch resources.",
+          "Incorrect. That’s an application concern, not the role of URLs."
+        ]
+      },
+      {
+        title: "If browsers ignored CSS standards and each implemented styles differently, what would most likely happen?",
+        choices: [
+          "Websites would look and work consistently everywhere.",
+          "Compatibility and accessibility would suffer across devices and assistive tools.",
+          "Security would automatically improve.",
+          "Nothing would change because HTML controls presentation."
+        ],
+        correct: 1,
+        explain: [
+          "Incorrect. Inconsistent implementations cause fragmentation.",
+          "Correct. Shared standards are essential for consistent presentation and accessibility.",
+          "Incorrect. Security is unrelated to CSS conformance.",
+          "Incorrect. CSS controls presentation; divergence would degrade UX."
+        ]
+      }
+    ];
+
+    // ------- Render Quiz -------
+    const quizEl = document.getElementById('quiz');
+
+    function renderQuiz(){
+      quizEl.innerHTML = '';
+      QUESTIONS.forEach((q, idx) => {
+        const id = `q${idx}`;
+        const block = document.createElement('div');
+        block.className = 'q-item';
+        block.innerHTML = `
+          <div class="q-title">${idx+1}. ${q.title}</div>
+          <div class="choices" role="group" aria-labelledby="${id}-title">
+            ${q.choices.map((c,i)=>
+              `<label class="choice">
+                <input type="radio" name="${id}" value="${i}" aria-label="Choice ${i+1}">
+                <span>${c}</span>
+              </label>`
+            ).join('')}
+          </div>
+          <div class="actions">
+            <button class="check" data-idx="${idx}">Check</button>
+            <button class="clear secondary" data-idx="${idx}">Clear</button>
+          </div>
+          <div class="feedback" id="fb-${id}" aria-live="polite"></div>
+        `;
+        quizEl.appendChild(block);
+      });
+    }
+
+    function getSelection(idx){
+      const name = `q${idx}`;
+      const input = document.querySelector(`input[name="${name}"]:checked`);
+      return input ? parseInt(input.value, 10) : null;
+    }
+
+    function setDisabled(idx, disabled){
+      const name = `q${idx}`;
+      document.querySelectorAll(`input[name="${name}"]`).forEach(el=>el.disabled = disabled);
+      const btn = document.querySelector(`button.check[data-idx="${idx}"]`);
+      if(btn) btn.disabled = disabled;
+    }
+
+    function checkOne(idx){
+      const pick = getSelection(idx);
+      const fb = document.getElementById(`fb-q${idx}`);
+      if(pick === null){
+        fb.textContent = 'Please select an option first.';
+        fb.className = 'feedback';
+        return false;
+      }
+      const q = QUESTIONS[idx];
+      const correct = (pick === q.correct);
+      fb.className = 'feedback ' + (correct ? 'correct' : 'incorrect');
+      fb.innerHTML = (correct ? '✅ ' : '❌ ') + q.explain[pick] + (correct ? '' : ` <br><span class="muted">Remember:</span> ${q.explain[q.correct]}`);
+      // After checking, lock the question
+      setDisabled(idx, true);
+      return correct;
+    }
+
+    function clearOne(idx){
+      const name = `q${idx}`;
+      document.querySelectorAll(`input[name="${name}"]`).forEach(el=>{
+        el.checked = false; el.disabled = false;
+      });
+      const fb = document.getElementById(`fb-q${idx}`);
+      fb.textContent = '';
+      fb.className = 'feedback';
+      const btn = document.querySelector(`button.check[data-idx="${idx}"]`);
+      if(btn) btn.disabled = false;
+    }
+
+    function scoreAll(){
+      let total = QUESTIONS.length, correct = 0, attempted = 0;
+      for(let i=0;i<QUESTIONS.length;i++){
+        const pick = getSelection(i);
+        if(pick !== null){ attempted++; if(pick === QUESTIONS[i].correct) correct++; }
+      }
+      return {total, correct, attempted};
+    }
+
+    // Event Delegation
+    quizEl.addEventListener('click', (e)=>{
+      const t = e.target;
+      if(t.matches('button.check')){
+        const idx = parseInt(t.dataset.idx, 10);
+        checkOne(idx);
+      }
+      if(t.matches('button.clear')){
+        const idx = parseInt(t.dataset.idx, 10);
+        clearOne(idx);
+        document.getElementById('scoreBadge').style.display = 'none';
+      }
+    });
+
+    document.getElementById('submitAll').addEventListener('click', ()=>{
+      let correct = 0;
+      for(let i=0;i<QUESTIONS.length;i++){
+        // Only auto-check unanswered ones; preserve existing feedback
+        const pick = getSelection(i);
+        const alreadyDisabled = document.querySelector(`button.check[data-idx="${i}"]`)?.disabled;
+        if(!alreadyDisabled){
+          const ok = checkOne(i);
+          if(ok) correct++;
+        } else {
+          if(pick === QUESTIONS[i].correct) correct++;
+        }
+      }
+      const badge = document.getElementById('scoreBadge');
+      badge.style.display = 'inline-flex';
+      const { total } = scoreAll();
+      badge.textContent = `Your score: ${correct} / ${QUESTIONS.length}`;
+      badge.className = 'pill ' + (correct >= Math.ceil(0.7*QUESTIONS.length) ? 'success' : 'warn');
+    });
+
+    document.getElementById('reset').addEventListener('click', ()=>{
+      renderQuiz();
+      document.getElementById('scoreBadge').style.display = 'none';
+      window.scrollTo({top: document.getElementById('practice').offsetTop - 80, behavior:'smooth'});
+    });
+
+    // Initial render
+    renderQuiz();
+  </script>
+</body>
+</html>
