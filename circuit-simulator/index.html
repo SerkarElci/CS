@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>UISG Circuit Studio</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <img class="brand-logo" src="assets/uisg-logo.png" alt="UISG logo">
+          <div>
+            <div class="brand-title">Circuit Studio</div>
+            <div class="brand-subtitle">UISG CS lab</div>
+          </div>
+        </div>
+        <div class="status-strip" aria-live="polite">
+          <span id="powerStatus" class="status-pill">Canvas ready</span>
+          <span id="selectionStatus" class="status-muted">Nothing selected</span>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <aside class="toolbox" aria-label="Circuit components">
+          <div class="panel-heading">
+            <span>Components</span>
+          </div>
+
+          <button class="tool-card" type="button" data-type="battery" aria-label="Drag battery to canvas">
+            <span class="tool-icon battery-icon" aria-hidden="true">
+              <span></span>
+              <span></span>
+            </span>
+            <span class="tool-label">Battery</span>
+          </button>
+
+          <button class="tool-card" type="button" data-type="bulb" aria-label="Drag light bulb to canvas">
+            <span class="tool-icon bulb-icon" aria-hidden="true">
+              <span></span>
+            </span>
+            <span class="tool-label">Light bulb</span>
+          </button>
+
+          <button class="tool-card" type="button" data-type="switch" aria-label="Drag switch to canvas">
+            <span class="tool-icon switch-icon" aria-hidden="true">
+              <span></span>
+            </span>
+            <span class="tool-label">Switch</span>
+          </button>
+        </aside>
+
+        <section class="simulator" aria-label="Circuit simulator">
+          <div class="simulator-bar">
+            <div>
+              <h1>Build a Circuit</h1>
+              <p id="canvasSummary">0 components, 0 cables</p>
+            </div>
+            <div class="controls">
+              <button id="deleteBtn" class="control-button danger" type="button" disabled>Delete</button>
+              <button id="clearBtn" class="control-button" type="button">Clear</button>
+            </div>
+          </div>
+
+          <div id="board" class="board" aria-label="Circuit canvas">
+            <svg id="wireLayer" class="wire-layer" aria-hidden="true"></svg>
+            <div id="componentLayer" class="component-layer"></div>
+            <svg id="wireOverlayLayer" class="wire-overlay-layer" aria-hidden="true"></svg>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
