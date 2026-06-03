@@ -1,6 +1,8 @@
 (function () {
   const SVG_NS = "http://www.w3.org/2000/svg";
   const TERMINAL_RADIUS = 13;
+  const SHORT_CIRCUIT_FIRE_DELAY_MS = 10000;
+  const SHORT_TIMER_TICK_MS = 120;
   const COMPONENT_SPECS = {
     battery: {
       label: "Battery",
@@ -38,12 +40,16 @@
     poweredBulbs: new Set(),
     poweredWires: new Set(),
     shortedWires: new Set(),
-    hasShortCircuit: false
+    shortedBatteryIds: new Set(),
+    batteryShorts: new Map(),
+    hasShortCircuit: false,
+    hasBatteryFire: false
   };
 
   const elements = {};
   let nextId = 1;
   let interaction = null;
+  let shortTimerId = null;
 
   document.addEventListener("DOMContentLoaded", init);
 
@@ -440,7 +446,11 @@
     state.poweredBulbs = new Set();
     state.poweredWires = new Set();
     state.shortedWires = new Set();
+    state.shortedBatteryIds = new Set();
+    state.batteryShorts.clear();
     state.hasShortCircuit = false;
+    state.hasBatteryFire = false;
+    syncShortTimerLoop();
     nextId = 1;
     render();
   }
@@ -475,13 +485,18 @@
   function render() {
     syncWireLayerSize();
     const analysis = analyzeCircuit();
+    const now = performance.now();
+    syncBatteryShorts(analysis.shortedBatteryIds, now);
     state.poweredBulbs = analysis.poweredBulbs;
     state.poweredWires = analysis.poweredWires;
     state.shortedWires = analysis.shortedWires;
+    state.shortedBatteryIds = analysis.shortedBatteryIds;
     state.hasShortCircuit = analysis.hasShortCircuit;
+    state.hasBatteryFire = hasActiveBatteryFire(now);
     renderWires();
-    renderComponents();
+    renderComponents(now);
     updateStatus();
+    syncShortTimerLoop();
   }
 
   function syncWireLayerSize() {
@@ -553,7 +568,7 @@
     }
   }
 
-  function renderComponents() {
+  function renderComponents(now = performance.now()) {
     elements.componentLayer.innerHTML = "";
 
     state.components.forEach((component) => {
@@ -565,13 +580,17 @@
         state.selected.id === component.id;
       const isPowered =
         component.type === "bulb" && state.poweredBulbs.has(component.id);
+      const shortState =
+        component.type === "battery" ? getBatteryShortState(component.id, now) : null;
 
       element.className = [
         "component",
         `component-${component.type}`,
         component.isClosed ? "is-closed" : "",
         isSelected ? "is-selected" : "",
-        isPowered ? "is-powered" : ""
+        isPowered ? "is-powered" : "",
+        shortState ? "is-short" : "",
+        shortState && shortState.isBurning ? "is-burning" : ""
       ]
         .filter(Boolean)
         .join(" ");
@@ -581,6 +600,9 @@
       element.style.top = `${component.y}px`;
       element.style.setProperty("--component-width", `${spec.width}px`);
       element.style.setProperty("--component-height", `${spec.height}px`);
+      if (shortState) {
+        applyBatteryHeatStyles(element, shortState.progress);
+      }
       element.setAttribute("role", "button");
       element.setAttribute("tabindex", "0");
       element.setAttribute("aria-label", `${spec.label} component`);
@@ -621,6 +643,11 @@
         <div class="battery-art" aria-hidden="true">
           <span class="battery-cell short"></span>
           <span class="battery-cell tall"></span>
+        </div>
+        <div class="battery-fire" aria-hidden="true">
+          <span class="flame flame-a"></span>
+          <span class="flame flame-b"></span>
+          <span class="flame flame-c"></span>
         </div>
         <div class="polarity positive">+</div>
       `;
@@ -705,6 +732,7 @@
     const shortedBatteries = findShortedBatteries();
     const powerAnalysis = computePowerAnalysis(shortedBatteries);
     const shortedWires = new Set();
+    const shortedBatteryIds = new Set(shortedBatteries.keys());
 
     shortedBatteries.forEach((pathWireIds) => {
       pathWireIds.forEach((wireId) => shortedWires.add(wireId));
@@ -714,20 +742,110 @@
       poweredBulbs: powerAnalysis.poweredBulbs,
       poweredWires: powerAnalysis.poweredWires,
       shortedWires,
+      shortedBatteryIds,
       hasShortCircuit: shortedBatteries.size > 0
+    };
+  }
+
+  function syncBatteryShorts(shortedBatteryIds, now) {
+    state.batteryShorts.forEach((record, batteryId) => {
+      if (!shortedBatteryIds.has(batteryId)) {
+        state.batteryShorts.delete(batteryId);
+      }
+    });
+
+    shortedBatteryIds.forEach((batteryId) => {
+      if (!state.batteryShorts.has(batteryId)) {
+        state.batteryShorts.set(batteryId, { startedAt: now });
+      }
+    });
+  }
+
+  function syncShortTimerLoop() {
+    const needsTimer = state.batteryShorts.size > 0;
+    if (needsTimer && shortTimerId === null) {
+      shortTimerId = window.setInterval(render, SHORT_TIMER_TICK_MS);
+      return;
+    }
+
+    if (!needsTimer && shortTimerId !== null) {
+      window.clearInterval(shortTimerId);
+      shortTimerId = null;
+    }
+  }
+
+  function getBatteryShortState(batteryId, now) {
+    const record = state.batteryShorts.get(batteryId);
+    if (!record) {
+      return null;
+    }
+
+    const progress = clamp(
+      (now - record.startedAt) / SHORT_CIRCUIT_FIRE_DELAY_MS,
+      0,
+      1
+    );
+
+    return {
+      progress,
+      isBurning: progress >= 1
+    };
+  }
+
+  function hasActiveBatteryFire(now) {
+    return Array.from(state.batteryShorts.keys()).some((batteryId) => {
+      const shortState = getBatteryShortState(batteryId, now);
+      return shortState && shortState.isBurning;
+    });
+  }
+
+  function applyBatteryHeatStyles(element, progress) {
+    element.style.setProperty("--battery-case-color", mixColor("#ffffff", "#f24a2f", progress));
+    element.style.setProperty("--battery-cell-color", mixColor("#28724a", "#ea3221", progress));
+    element.style.setProperty("--battery-tall-cell-color", mixColor("#d9643a", "#ff1f12", progress));
+    element.style.setProperty("--battery-heat-alpha", (progress * 0.46).toFixed(3));
+    element.style.setProperty("--battery-glow-alpha", (progress * 0.54).toFixed(3));
+  }
+
+  function mixColor(fromHex, toHex, amount) {
+    const from = hexToRgb(fromHex);
+    const to = hexToRgb(toHex);
+    const mix = (start, end) => Math.round(start + (end - start) * amount);
+    return `rgb(${mix(from.r, to.r)}, ${mix(from.g, to.g)}, ${mix(from.b, to.b)})`;
+  }
+
+  function hexToRgb(hex) {
+    const value = hex.replace("#", "");
+    return {
+      r: parseInt(value.slice(0, 2), 16),
+      g: parseInt(value.slice(2, 4), 16),
+      b: parseInt(value.slice(4, 6), 16)
     };
   }
 
   function findShortedBatteries() {
     const shorted = new Map();
-    const adjacency = buildConductiveGraph({ includeBulbs: false });
+    const batteryCount = state.components.filter(
+      (component) => component.type === "battery"
+    ).length;
 
     state.components
       .filter((component) => component.type === "battery")
       .forEach((battery) => {
+        const adjacency = buildConductiveGraph({
+          includeBulbs: false,
+          conductiveBatteryId: battery.id,
+          trackBatteryVoltage: true
+        });
         const batteryNeg = terminalNode(battery.id, "neg");
         const batteryPos = terminalNode(battery.id, "pos");
-        const shortPathWireIds = findPathWireIds(adjacency, batteryNeg, batteryPos);
+        const shortPathWireIds = findUnsafeBatteryShortPath(
+          adjacency,
+          batteryNeg,
+          batteryPos,
+          1,
+          batteryCount + 1
+        );
 
         if (shortPathWireIds) {
           shorted.set(battery.id, shortPathWireIds);
@@ -742,40 +860,37 @@
     const poweredWires = new Set();
     const batteries = state.components.filter((component) => component.type === "battery");
     const bulbs = state.components.filter((component) => component.type === "bulb");
+    const activeBatteryIds = new Set(
+      batteries
+        .filter((battery) => !shortedBatteries.has(battery.id))
+        .map((battery) => battery.id)
+    );
 
     bulbs.forEach((bulb) => {
       const bulbA = terminalNode(bulb.id, "a");
       const bulbB = terminalNode(bulb.id, "b");
-
-      batteries.some((battery) => {
-        if (shortedBatteries.has(battery.id)) {
-          return false;
-        }
-
-        const batteryNeg = terminalNode(battery.id, "neg");
-        const batteryPos = terminalNode(battery.id, "pos");
-        const adjacency = buildConductiveGraph({ ignoredBulbId: bulb.id });
-        const normalNegPath = findPathWireIds(adjacency, bulbA, batteryNeg);
-        const normalPosPath = findPathWireIds(adjacency, bulbB, batteryPos);
-        const reversePosPath = findPathWireIds(adjacency, bulbA, batteryPos);
-        const reverseNegPath = findPathWireIds(adjacency, bulbB, batteryNeg);
-
-        if (normalNegPath && normalPosPath) {
-          poweredBulbs.add(bulb.id);
-          addWireIds(poweredWires, normalNegPath);
-          addWireIds(poweredWires, normalPosPath);
-          return true;
-        }
-
-        if (reversePosPath && reverseNegPath) {
-          poweredBulbs.add(bulb.id);
-          addWireIds(poweredWires, reversePosPath);
-          addWireIds(poweredWires, reverseNegPath);
-          return true;
-        }
-
-        return false;
+      const adjacency = buildConductiveGraph({
+        ignoredBulbId: bulb.id,
+        conductiveBatteryIds: activeBatteryIds,
+        trackBatteryVoltage: true
       });
+      const voltageAnalysis = computeVoltageAnalysis(adjacency);
+      const terminalA = voltageAnalysis.nodes.get(bulbA);
+      const terminalB = voltageAnalysis.nodes.get(bulbB);
+
+      if (
+        terminalA &&
+        terminalB &&
+        terminalA.networkId === terminalB.networkId &&
+        !voltageAnalysis.inconsistentNetworks.has(terminalA.networkId) &&
+        terminalA.voltage !== terminalB.voltage
+      ) {
+        poweredBulbs.add(bulb.id);
+        const circuitPath = findPathWireIds(adjacency, bulbA, bulbB);
+        if (circuitPath) {
+          addWireIds(poweredWires, circuitPath);
+        }
+      }
     });
 
     return { poweredBulbs, poweredWires };
@@ -788,6 +903,9 @@
   function buildConductiveGraph(options = {}) {
     const ignoredBulbId = options.ignoredBulbId;
     const includeBulbs = options.includeBulbs !== false;
+    const conductiveBatteryId = options.conductiveBatteryId;
+    const conductiveBatteryIds = options.conductiveBatteryIds;
+    const trackBatteryVoltage = Boolean(options.trackBatteryVoltage);
     const adjacency = new Map();
 
     state.components.forEach((component) => {
@@ -830,9 +948,30 @@
           null
         );
       }
+
+      if (
+        component.type === "battery" &&
+        shouldConductBattery(component.id, conductiveBatteryId, conductiveBatteryIds)
+      ) {
+        addGraphEdge(
+          adjacency,
+          terminalNode(component.id, "neg"),
+          terminalNode(component.id, "pos"),
+          null,
+          trackBatteryVoltage ? 1 : 0
+        );
+      }
     });
 
     return adjacency;
+  }
+
+  function shouldConductBattery(componentId, conductiveBatteryId, conductiveBatteryIds) {
+    if (conductiveBatteryIds) {
+      return conductiveBatteryIds.has(componentId);
+    }
+
+    return Boolean(conductiveBatteryId && componentId !== conductiveBatteryId);
   }
 
   function ensureNode(adjacency, node) {
@@ -841,11 +980,11 @@
     }
   }
 
-  function addGraphEdge(adjacency, from, to, wireId) {
+  function addGraphEdge(adjacency, from, to, wireId, voltageDelta = 0) {
     ensureNode(adjacency, from);
     ensureNode(adjacency, to);
-    adjacency.get(from).push({ to, wireId });
-    adjacency.get(to).push({ to: from, wireId });
+    adjacency.get(from).push({ to, wireId, voltageDelta });
+    adjacency.get(to).push({ to: from, wireId, voltageDelta: -voltageDelta });
   }
 
   function areConnected(adjacency, start, target) {
@@ -888,6 +1027,101 @@
     return null;
   }
 
+  function computeVoltageAnalysis(adjacency) {
+    const nodes = new Map();
+    const inconsistentNetworks = new Set();
+    let nextNetworkId = 1;
+
+    adjacency.forEach((_, start) => {
+      if (nodes.has(start)) {
+        return;
+      }
+
+      const networkId = nextNetworkId;
+      nextNetworkId += 1;
+      nodes.set(start, { networkId, voltage: 0 });
+      const queue = [start];
+
+      while (queue.length) {
+        const current = queue.shift();
+        const currentState = nodes.get(current);
+        const neighbors = adjacency.get(current);
+        if (!neighbors) {
+          continue;
+        }
+
+        for (const edge of neighbors) {
+          const nextVoltage = currentState.voltage + (edge.voltageDelta || 0);
+          const nextState = nodes.get(edge.to);
+
+          if (!nextState) {
+            nodes.set(edge.to, { networkId, voltage: nextVoltage });
+            queue.push(edge.to);
+            continue;
+          }
+
+          if (
+            nextState.networkId === networkId &&
+            nextState.voltage !== nextVoltage
+          ) {
+            inconsistentNetworks.add(networkId);
+          }
+        }
+      }
+    });
+
+    return { nodes, inconsistentNetworks };
+  }
+
+  function findUnsafeBatteryShortPath(
+    adjacency,
+    start,
+    target,
+    expectedVoltageDelta,
+    maxAbsVoltageDelta
+  ) {
+    if (start === target) {
+      return null;
+    }
+
+    const startState = pathStateKey(start, 0);
+    const queue = [{ node: start, voltageDelta: 0, key: startState }];
+    const visited = new Set([startState]);
+    const previous = new Map();
+
+    while (queue.length) {
+      const current = queue.shift();
+      const neighbors = adjacency.get(current.node);
+      if (!neighbors) {
+        continue;
+      }
+
+      for (const edge of neighbors) {
+        const nextVoltageDelta = current.voltageDelta + (edge.voltageDelta || 0);
+        if (Math.abs(nextVoltageDelta) > maxAbsVoltageDelta) {
+          continue;
+        }
+
+        const next = edge.to;
+        const nextKey = pathStateKey(next, nextVoltageDelta);
+        if (visited.has(nextKey)) {
+          continue;
+        }
+
+        visited.add(nextKey);
+        previous.set(nextKey, { fromKey: current.key, wireId: edge.wireId });
+
+        if (next === target && nextVoltageDelta !== expectedVoltageDelta) {
+          return collectStatePathWireIds(previous, startState, nextKey);
+        }
+
+        queue.push({ node: next, voltageDelta: nextVoltageDelta, key: nextKey });
+      }
+    }
+
+    return null;
+  }
+
   function collectPathWireIds(previous, start, target) {
     const wireIds = new Set();
     let current = target;
@@ -906,6 +1140,30 @@
     }
 
     return wireIds;
+  }
+
+  function collectStatePathWireIds(previous, startKey, targetKey) {
+    const wireIds = new Set();
+    let currentKey = targetKey;
+
+    while (currentKey !== startKey) {
+      const step = previous.get(currentKey);
+      if (!step) {
+        return null;
+      }
+
+      if (step.wireId) {
+        wireIds.add(step.wireId);
+      }
+
+      currentKey = step.fromKey;
+    }
+
+    return wireIds;
+  }
+
+  function pathStateKey(node, voltageDelta) {
+    return `${node}|${voltageDelta}`;
   }
 
   function terminalNode(componentId, terminalId) {
@@ -1008,8 +1266,11 @@
       poweredCount > 0 && !state.hasShortCircuit
     );
     elements.powerStatus.classList.toggle("is-short", state.hasShortCircuit);
+    elements.powerStatus.classList.toggle("is-fire", state.hasBatteryFire);
     if (componentCount === 0) {
       elements.powerStatus.textContent = "Canvas ready";
+    } else if (state.hasBatteryFire) {
+      elements.powerStatus.textContent = "Battery fire";
     } else if (state.hasShortCircuit) {
       elements.powerStatus.textContent = "Short circuit";
     } else if (poweredCount > 0) {
