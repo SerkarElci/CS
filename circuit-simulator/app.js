@@ -1,13 +1,14 @@
 (function () {
   const SVG_NS = "http://www.w3.org/2000/svg";
+  const TERMINAL_RADIUS = 13;
   const COMPONENT_SPECS = {
     battery: {
       label: "Battery",
       width: 132,
       height: 88,
       terminals: [
-        { id: "neg", label: "-", x: 10, y: 44 },
-        { id: "pos", label: "+", x: 122, y: 44 }
+        { id: "neg", label: "-", x: -2, y: 44 },
+        { id: "pos", label: "+", x: 134, y: 44 }
       ]
     },
     bulb: {
@@ -15,8 +16,8 @@
       width: 118,
       height: 124,
       terminals: [
-        { id: "a", label: "", x: 34, y: 110 },
-        { id: "b", label: "", x: 84, y: 110 }
+        { id: "a", label: "", x: 34, y: 126 },
+        { id: "b", label: "", x: 84, y: 126 }
       ]
     },
     switch: {
@@ -24,8 +25,8 @@
       width: 132,
       height: 82,
       terminals: [
-        { id: "a", label: "", x: 10, y: 44 },
-        { id: "b", label: "", x: 122, y: 44 }
+        { id: "a", label: "", x: -2, y: 44 },
+        { id: "b", label: "", x: 134, y: 44 }
       ]
     }
   };
@@ -35,6 +36,8 @@
     wires: [],
     selected: null,
     poweredBulbs: new Set(),
+    poweredWires: new Set(),
+    shortedWires: new Set(),
     hasShortCircuit: false
   };
 
@@ -47,7 +50,6 @@
   function init() {
     elements.board = document.getElementById("board");
     elements.wireLayer = document.getElementById("wireLayer");
-    elements.wireOverlayLayer = document.getElementById("wireOverlayLayer");
     elements.componentLayer = document.getElementById("componentLayer");
     elements.powerStatus = document.getElementById("powerStatus");
     elements.selectionStatus = document.getElementById("selectionStatus");
@@ -165,6 +167,30 @@
     render();
   }
 
+  function startWireBend(event, wireId) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    state.selected = { type: "wire", id: wireId };
+
+    const point = clientToBoard(event.clientX, event.clientY);
+    interaction = {
+      mode: "wire-bend",
+      pointerId: event.pointerId,
+      wireId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startPoint: point,
+      moved: false
+    };
+
+    bindPointerLifecycle();
+    render();
+  }
+
   function bindPointerLifecycle() {
     document.addEventListener("pointermove", handlePointerMove);
     document.addEventListener("pointerup", handlePointerUp);
@@ -218,6 +244,26 @@
     if (interaction.mode === "wire") {
       interaction.end = clientToBoard(event.clientX, event.clientY);
       render();
+      return;
+    }
+
+    if (interaction.mode === "wire-bend") {
+      const wire = getWire(interaction.wireId);
+      if (!wire) {
+        cancelInteraction();
+        return;
+      }
+
+      const distance = Math.hypot(
+        event.clientX - interaction.startClientX,
+        event.clientY - interaction.startClientY
+      );
+      interaction.moved = interaction.moved || distance > 4;
+
+      if (interaction.moved) {
+        wire.control = clampBoardPoint(clientToBoard(event.clientX, event.clientY));
+        render();
+      }
     }
   }
 
@@ -264,6 +310,12 @@
         addWire(source, target);
       }
 
+      finishInteraction(false);
+      render();
+      return;
+    }
+
+    if (interaction.mode === "wire-bend") {
       finishInteraction(false);
       render();
     }
@@ -316,7 +368,8 @@
       fromComponentId: source.componentId,
       fromTerminalId: source.terminalId,
       toComponentId: target.componentId,
-      toTerminalId: target.terminalId
+      toTerminalId: target.terminalId,
+      control: null
     };
 
     state.wires.push(wire);
@@ -385,6 +438,8 @@
     state.wires = [];
     state.selected = null;
     state.poweredBulbs = new Set();
+    state.poweredWires = new Set();
+    state.shortedWires = new Set();
     state.hasShortCircuit = false;
     nextId = 1;
     render();
@@ -421,6 +476,8 @@
     syncWireLayerSize();
     const analysis = analyzeCircuit();
     state.poweredBulbs = analysis.poweredBulbs;
+    state.poweredWires = analysis.poweredWires;
+    state.shortedWires = analysis.shortedWires;
     state.hasShortCircuit = analysis.hasShortCircuit;
     renderWires();
     renderComponents();
@@ -429,16 +486,13 @@
 
   function syncWireLayerSize() {
     const rect = elements.board.getBoundingClientRect();
-    [elements.wireLayer, elements.wireOverlayLayer].forEach((layer) => {
-      layer.setAttribute("width", rect.width);
-      layer.setAttribute("height", rect.height);
-      layer.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
-    });
+    elements.wireLayer.setAttribute("width", rect.width);
+    elements.wireLayer.setAttribute("height", rect.height);
+    elements.wireLayer.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
   }
 
   function renderWires() {
     elements.wireLayer.innerHTML = "";
-    elements.wireOverlayLayer.innerHTML = "";
 
     state.wires.forEach((wire) => {
       const from = getTerminalPosition(wire.fromComponentId, wire.fromTerminalId);
@@ -447,31 +501,40 @@
         return;
       }
 
-      const pathData = cablePath(from, to);
-      const hit = makePath(pathData, "wire-hit");
+      const control = getWireControlPoint(wire, from, to);
+      const pathData = cablePath(from, to, control);
       const sleeve = makePath(pathData, "wire-sleeve");
       const visible = makePath(pathData, "wire-visible");
+      const hit = makePath(pathData, "wire-hit");
       const isSelected =
         state.selected &&
         state.selected.type === "wire" &&
         state.selected.id === wire.id;
+      const isPowered = state.poweredWires.has(wire.id);
+      const isShorted = state.shortedWires.has(wire.id);
 
       if (isSelected) {
         sleeve.classList.add("is-selected");
         visible.classList.add("is-selected");
       }
+      if (isShorted) {
+        sleeve.classList.add("is-short");
+        visible.classList.add("is-short");
+      } else if (isPowered) {
+        sleeve.classList.add("is-powered");
+        visible.classList.add("is-powered");
+      }
 
       hit.dataset.wireId = wire.id;
-      hit.addEventListener("pointerdown", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        state.selected = { type: "wire", id: wire.id };
-        render();
-      });
+      hit.addEventListener("pointerdown", (event) => startWireBend(event, wire.id));
 
+      elements.wireLayer.appendChild(sleeve);
+      elements.wireLayer.appendChild(visible);
       elements.wireLayer.appendChild(hit);
-      elements.wireOverlayLayer.appendChild(sleeve);
-      elements.wireOverlayLayer.appendChild(visible);
+
+      if (isSelected) {
+        elements.wireLayer.appendChild(makeWireControl(control));
+      }
     });
 
     if (interaction && interaction.mode === "wire") {
@@ -480,8 +543,11 @@
         interaction.fromTerminalId
       );
       if (from && interaction.end) {
-        elements.wireOverlayLayer.appendChild(
-          makePath(cablePath(from, interaction.end), "wire-preview")
+        elements.wireLayer.appendChild(
+          makePath(
+            cablePath(from, interaction.end, getDefaultCableControl(from, interaction.end)),
+            "wire-preview"
+          )
         );
       }
     }
@@ -526,8 +592,8 @@
         terminalElement.className = "terminal";
         terminalElement.dataset.componentId = component.id;
         terminalElement.dataset.terminalId = terminal.id;
-        terminalElement.style.left = `${terminal.x - 11}px`;
-        terminalElement.style.top = `${terminal.y - 11}px`;
+        terminalElement.style.left = `${terminal.x - TERMINAL_RADIUS}px`;
+        terminalElement.style.top = `${terminal.y - TERMINAL_RADIUS}px`;
         terminalElement.textContent = terminal.label;
         terminalElement.setAttribute(
           "aria-label",
@@ -593,29 +659,42 @@
     return path;
   }
 
-  function cablePath(from, to) {
-    const dx = to.x - from.x;
-    const dy = to.y - from.y;
+  function makeWireControl(point) {
+    const circle = document.createElementNS(SVG_NS, "circle");
+    circle.setAttribute("cx", point.x);
+    circle.setAttribute("cy", point.y);
+    circle.setAttribute("r", 6);
+    circle.setAttribute("class", "wire-control");
+    return circle;
+  }
 
-    if (Math.abs(dx) < 36 && Math.abs(dy) > 36) {
-      const offset = Math.max(46, Math.min(110, Math.abs(dy) * 0.38));
-      const direction = dy >= 0 ? 1 : -1;
-      return [
-        `M ${round(from.x)} ${round(from.y)}`,
-        `C ${round(from.x)} ${round(from.y + offset * direction)},`,
-        `${round(to.x)} ${round(to.y - offset * direction)},`,
-        `${round(to.x)} ${round(to.y)}`
-      ].join(" ");
-    }
-
-    const bend = Math.max(48, Math.min(160, Math.abs(dx) * 0.5));
-    const direction = dx >= 0 ? 1 : -1;
+  function cablePath(from, to, control) {
     return [
       `M ${round(from.x)} ${round(from.y)}`,
-      `C ${round(from.x + bend * direction)} ${round(from.y)},`,
-      `${round(to.x - bend * direction)} ${round(to.y)},`,
+      `Q ${round(control.x)} ${round(control.y)},`,
       `${round(to.x)} ${round(to.y)}`
     ].join(" ");
+  }
+
+  function getWireControlPoint(wire, from, to) {
+    if (wire.control) {
+      return wire.control;
+    }
+
+    return getDefaultCableControl(from, to);
+  }
+
+  function getDefaultCableControl(from, to) {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const distance = Math.hypot(dx, dy);
+    const sag = Math.max(20, Math.min(86, distance * 0.18));
+    const bendDirection = dy >= 0 ? 1 : -1;
+
+    return {
+      x: from.x + dx / 2,
+      y: from.y + dy / 2 + sag * bendDirection
+    };
   }
 
   function round(value) {
@@ -624,15 +703,23 @@
 
   function analyzeCircuit() {
     const shortedBatteries = findShortedBatteries();
+    const powerAnalysis = computePowerAnalysis(shortedBatteries);
+    const shortedWires = new Set();
+
+    shortedBatteries.forEach((pathWireIds) => {
+      pathWireIds.forEach((wireId) => shortedWires.add(wireId));
+    });
 
     return {
-      poweredBulbs: computePoweredBulbs(shortedBatteries),
+      poweredBulbs: powerAnalysis.poweredBulbs,
+      poweredWires: powerAnalysis.poweredWires,
+      shortedWires,
       hasShortCircuit: shortedBatteries.size > 0
     };
   }
 
   function findShortedBatteries() {
-    const shorted = new Set();
+    const shorted = new Map();
     const adjacency = buildConductiveGraph({ includeBulbs: false });
 
     state.components
@@ -640,17 +727,19 @@
       .forEach((battery) => {
         const batteryNeg = terminalNode(battery.id, "neg");
         const batteryPos = terminalNode(battery.id, "pos");
+        const shortPathWireIds = findPathWireIds(adjacency, batteryNeg, batteryPos);
 
-        if (areConnected(adjacency, batteryNeg, batteryPos)) {
-          shorted.add(battery.id);
+        if (shortPathWireIds) {
+          shorted.set(battery.id, shortPathWireIds);
         }
       });
 
     return shorted;
   }
 
-  function computePoweredBulbs(shortedBatteries) {
-    const powered = new Set();
+  function computePowerAnalysis(shortedBatteries) {
+    const poweredBulbs = new Set();
+    const poweredWires = new Set();
     const batteries = state.components.filter((component) => component.type === "battery");
     const bulbs = state.components.filter((component) => component.type === "bulb");
 
@@ -658,7 +747,7 @@
       const bulbA = terminalNode(bulb.id, "a");
       const bulbB = terminalNode(bulb.id, "b");
 
-      const isPowered = batteries.some((battery) => {
+      batteries.some((battery) => {
         if (shortedBatteries.has(battery.id)) {
           return false;
         }
@@ -666,23 +755,34 @@
         const batteryNeg = terminalNode(battery.id, "neg");
         const batteryPos = terminalNode(battery.id, "pos");
         const adjacency = buildConductiveGraph({ ignoredBulbId: bulb.id });
+        const normalNegPath = findPathWireIds(adjacency, bulbA, batteryNeg);
+        const normalPosPath = findPathWireIds(adjacency, bulbB, batteryPos);
+        const reversePosPath = findPathWireIds(adjacency, bulbA, batteryPos);
+        const reverseNegPath = findPathWireIds(adjacency, bulbB, batteryNeg);
 
-        const normalPath =
-          areConnected(adjacency, bulbA, batteryNeg) &&
-          areConnected(adjacency, bulbB, batteryPos);
-        const reversePath =
-          areConnected(adjacency, bulbA, batteryPos) &&
-          areConnected(adjacency, bulbB, batteryNeg);
+        if (normalNegPath && normalPosPath) {
+          poweredBulbs.add(bulb.id);
+          addWireIds(poweredWires, normalNegPath);
+          addWireIds(poweredWires, normalPosPath);
+          return true;
+        }
 
-        return normalPath || reversePath;
+        if (reversePosPath && reverseNegPath) {
+          poweredBulbs.add(bulb.id);
+          addWireIds(poweredWires, reversePosPath);
+          addWireIds(poweredWires, reverseNegPath);
+          return true;
+        }
+
+        return false;
       });
-
-      if (isPowered) {
-        powered.add(bulb.id);
-      }
     });
 
-    return powered;
+    return { poweredBulbs, poweredWires };
+  }
+
+  function addWireIds(target, wireIds) {
+    wireIds.forEach((wireId) => target.add(wireId));
   }
 
   function buildConductiveGraph(options = {}) {
@@ -703,7 +803,8 @@
       addGraphEdge(
         adjacency,
         terminalNode(wire.fromComponentId, wire.fromTerminalId),
-        terminalNode(wire.toComponentId, wire.toTerminalId)
+        terminalNode(wire.toComponentId, wire.toTerminalId),
+        wire.id
       );
     });
 
@@ -712,7 +813,8 @@
         addGraphEdge(
           adjacency,
           terminalNode(component.id, "a"),
-          terminalNode(component.id, "b")
+          terminalNode(component.id, "b"),
+          null
         );
       }
 
@@ -724,7 +826,8 @@
         addGraphEdge(
           adjacency,
           terminalNode(component.id, "a"),
-          terminalNode(component.id, "b")
+          terminalNode(component.id, "b"),
+          null
         );
       }
     });
@@ -734,24 +837,29 @@
 
   function ensureNode(adjacency, node) {
     if (!adjacency.has(node)) {
-      adjacency.set(node, new Set());
+      adjacency.set(node, []);
     }
   }
 
-  function addGraphEdge(adjacency, from, to) {
+  function addGraphEdge(adjacency, from, to, wireId) {
     ensureNode(adjacency, from);
     ensureNode(adjacency, to);
-    adjacency.get(from).add(to);
-    adjacency.get(to).add(from);
+    adjacency.get(from).push({ to, wireId });
+    adjacency.get(to).push({ to: from, wireId });
   }
 
   function areConnected(adjacency, start, target) {
+    return Boolean(findPathWireIds(adjacency, start, target));
+  }
+
+  function findPathWireIds(adjacency, start, target) {
     if (start === target) {
-      return true;
+      return new Set();
     }
 
     const queue = [start];
     const visited = new Set(queue);
+    const previous = new Map();
 
     while (queue.length) {
       const current = queue.shift();
@@ -760,18 +868,44 @@
         continue;
       }
 
-      for (const next of neighbors) {
+      for (const edge of neighbors) {
+        const next = edge.to;
+        if (visited.has(next)) {
+          continue;
+        }
+
+        visited.add(next);
+        previous.set(next, { from: current, wireId: edge.wireId });
+
         if (next === target) {
-          return true;
+          return collectPathWireIds(previous, start, target);
         }
-        if (!visited.has(next)) {
-          visited.add(next);
-          queue.push(next);
-        }
+
+        queue.push(next);
       }
     }
 
-    return false;
+    return null;
+  }
+
+  function collectPathWireIds(previous, start, target) {
+    const wireIds = new Set();
+    let current = target;
+
+    while (current !== start) {
+      const step = previous.get(current);
+      if (!step) {
+        return null;
+      }
+
+      if (step.wireId) {
+        wireIds.add(step.wireId);
+      }
+
+      current = step.from;
+    }
+
+    return wireIds;
   }
 
   function terminalNode(componentId, terminalId) {
@@ -780,6 +914,10 @@
 
   function getComponent(componentId) {
     return state.components.find((component) => component.id === componentId);
+  }
+
+  function getWire(wireId) {
+    return state.wires.find((wire) => wire.id === wireId);
   }
 
   function getTerminalPosition(componentId, terminalId) {
@@ -822,6 +960,15 @@
     };
   }
 
+  function clampBoardPoint(point) {
+    const rect = elements.board.getBoundingClientRect();
+    const padding = TERMINAL_RADIUS;
+    return {
+      x: clamp(point.x, padding, Math.max(padding, rect.width - padding)),
+      y: clamp(point.y, padding, Math.max(padding, rect.height - padding))
+    };
+  }
+
   function isInsideBoard(clientX, clientY) {
     const rect = elements.board.getBoundingClientRect();
     return (
@@ -835,7 +982,7 @@
   function clampComponentPosition(type, x, y) {
     const spec = COMPONENT_SPECS[type];
     const rect = elements.board.getBoundingClientRect();
-    const padding = 8;
+    const padding = 24;
     return {
       x: clamp(x, padding, Math.max(padding, rect.width - spec.width - padding)),
       y: clamp(y, padding, Math.max(padding, rect.height - spec.height - padding))

@@ -6,7 +6,9 @@
   --muted: #66736d;
   --brand: #28724a;
   --brand-dark: #195838;
-  --cable: #2f5961;
+  --cable: #101716;
+  --cable-core: #f9fbf8;
+  --cable-live: #1e9cff;
   --amber: #f1b629;
   --orange: #d9643a;
   --line: #d9e1dc;
@@ -359,7 +361,6 @@ button {
 }
 
 .wire-layer,
-.wire-overlay-layer,
 .component-layer {
   position: absolute;
   inset: 0;
@@ -374,47 +375,80 @@ button {
   pointer-events: none;
 }
 
-.wire-overlay-layer {
-  z-index: 3;
-  pointer-events: none;
-}
-
 .wire-sleeve {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.9);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 14;
-  filter: drop-shadow(0 7px 9px rgba(31, 55, 47, 0.18));
-  pointer-events: none;
-}
-
-.wire-sleeve.is-selected {
-  stroke: rgba(255, 236, 174, 0.98);
-}
-
-.wire-visible {
   fill: none;
   stroke: var(--cable);
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-width: 6;
-  filter: drop-shadow(0 2px 2px rgba(41, 65, 56, 0.14));
+  stroke-width: 10;
+  filter: drop-shadow(0 4px 7px rgba(31, 55, 47, 0.16));
   pointer-events: none;
 }
 
+.wire-sleeve.is-powered {
+  filter:
+    drop-shadow(0 0 5px rgba(30, 156, 255, 0.45))
+    drop-shadow(0 4px 7px rgba(31, 55, 47, 0.16));
+}
+
+.wire-sleeve.is-short {
+  stroke: #6d2519;
+  filter:
+    drop-shadow(0 0 5px rgba(217, 100, 58, 0.48))
+    drop-shadow(0 4px 7px rgba(31, 55, 47, 0.16));
+}
+
+.wire-sleeve.is-selected {
+  stroke: #8d6812;
+}
+
+.wire-visible {
+  fill: none;
+  stroke: var(--cable-core);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 6;
+  pointer-events: none;
+}
+
+.wire-visible.is-powered {
+  stroke: var(--cable-live);
+  filter:
+    drop-shadow(0 0 4px rgba(30, 156, 255, 0.82))
+    drop-shadow(0 0 12px rgba(30, 156, 255, 0.26));
+}
+
+.wire-visible.is-short {
+  stroke: var(--orange);
+  filter:
+    drop-shadow(0 0 5px rgba(217, 100, 58, 0.8))
+    drop-shadow(0 0 12px rgba(217, 100, 58, 0.28));
+}
+
 .wire-visible.is-selected {
-  stroke: var(--amber);
-  stroke-width: 9;
+  stroke-width: 7;
 }
 
 .wire-hit {
   fill: none;
-  stroke: rgba(47, 89, 97, 0.01);
+  stroke: rgba(16, 23, 22, 0.01);
   stroke-linecap: round;
-  stroke-width: 24;
+  stroke-linejoin: round;
+  stroke-width: 28;
   pointer-events: stroke;
-  cursor: pointer;
+  cursor: grab;
+}
+
+.wire-hit:active {
+  cursor: grabbing;
+}
+
+.wire-control {
+  fill: #fff8d6;
+  stroke: #8d6812;
+  stroke-width: 3;
+  filter: drop-shadow(0 4px 7px rgba(31, 55, 47, 0.18));
+  pointer-events: none;
 }
 
 .wire-preview {
@@ -462,8 +496,8 @@ button {
 
 .terminal {
   position: absolute;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
   border: 3px solid #fff;
@@ -478,6 +512,7 @@ button {
   line-height: 1;
   cursor: crosshair;
   pointer-events: auto;
+  z-index: 2;
 }
 
 .terminal:hover,
