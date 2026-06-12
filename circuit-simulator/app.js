@@ -762,7 +762,7 @@
   }
 
   function syncShortTimerLoop() {
-    const needsTimer = state.batteryShorts.size > 0;
+    const needsTimer = state.batteryShorts.size > 0 && !state.hasBatteryFire;
     if (needsTimer && shortTimerId === null) {
       shortTimerId = window.setInterval(render, SHORT_TIMER_TICK_MS);
       return;
