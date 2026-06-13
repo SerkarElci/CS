@@ -431,6 +431,8 @@
         (wire) =>
           wire.fromComponentId !== componentId && wire.toComponentId !== componentId
       );
+
+      renderComponents(performance.now());
     }
 
     if (state.selected.type === "wire") {
@@ -439,7 +441,6 @@
 
     state.selected = null;
 
-    renderComponents(performance.now());
     render();
   }
 
@@ -815,7 +816,10 @@
   function getBatteryShortState(batteryId, now) {
     const record = state.batteryShorts.get(batteryId);
     if (!record) {
-      return null;
+      return {
+        progress: 0,
+        isBurning: false
+      };
     }
 
     const progress = clamp(
