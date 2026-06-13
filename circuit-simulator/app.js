@@ -366,6 +366,8 @@
 
     state.components.push(component);
     state.selected = { type: "component", id: component.id };
+
+    renderComponents(performance.now());
   }
 
   function addWire(source, target) {
@@ -429,6 +431,8 @@
         (wire) =>
           wire.fromComponentId !== componentId && wire.toComponentId !== componentId
       );
+
+      renderComponents(performance.now());
     }
 
     if (state.selected.type === "wire") {
@@ -436,6 +440,7 @@
     }
 
     state.selected = null;
+
     render();
   }
 
@@ -494,7 +499,7 @@
     state.hasShortCircuit = analysis.hasShortCircuit;
     state.hasBatteryFire = hasActiveBatteryFire(now);
     renderWires();
-    renderComponents(now);
+    updateComponents(now);
     updateStatus();
     syncShortTimerLoop();
   }
@@ -568,6 +573,45 @@
     }
   }
 
+  function updateComponents(now = performance.now()) {
+    const components = elements.componentLayer.querySelectorAll('.component');
+    
+    components.forEach((element) => {
+      const component = getComponent(element.dataset.componentId);
+      const isSelected =
+        state.selected &&
+        state.selected.type === "component" &&
+        state.selected.id === component.id;
+      const isPowered =
+        component.type === "bulb" && state.poweredBulbs.has(component.id);
+      const shortState =
+        component.type === "battery" ? getBatteryShortState(component.id, now) : null;
+
+      element.className = [
+        "component",
+        `component-${component.type}`,
+        component.isClosed ? "is-closed" : "",
+        isSelected ? "is-selected" : "",
+        isPowered ? "is-powered" : "",
+        shortState ? "is-short" : "",
+        shortState && shortState.isBurning ? "is-burning" : ""
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      element.style.left = `${component.x}px`;
+      element.style.top = `${component.y}px`;
+      
+      if (shortState) {
+        applyBatteryHeatStyles(element, shortState.progress);
+      }
+
+      else if (component.type === "switch") {
+        element.querySelector('.switch-state').textContent = `${component.isClosed ? "Closed" : "Open"}`;
+      }
+    });
+  }
+
   function renderComponents(now = performance.now()) {
     elements.componentLayer.innerHTML = "";
 
@@ -596,13 +640,8 @@
         .join(" ");
 
       element.dataset.componentId = component.id;
-      element.style.left = `${component.x}px`;
-      element.style.top = `${component.y}px`;
       element.style.setProperty("--component-width", `${spec.width}px`);
       element.style.setProperty("--component-height", `${spec.height}px`);
-      if (shortState) {
-        applyBatteryHeatStyles(element, shortState.progress);
-      }
       element.setAttribute("role", "button");
       element.setAttribute("tabindex", "0");
       element.setAttribute("aria-label", `${spec.label} component`);
@@ -762,7 +801,7 @@
   }
 
   function syncShortTimerLoop() {
-    const needsTimer = state.batteryShorts.size > 0;
+    const needsTimer = state.hasShortCircuit;
     if (needsTimer && shortTimerId === null) {
       shortTimerId = window.setInterval(render, SHORT_TIMER_TICK_MS);
       return;
@@ -777,7 +816,10 @@
   function getBatteryShortState(batteryId, now) {
     const record = state.batteryShorts.get(batteryId);
     if (!record) {
-      return null;
+      return {
+        progress: 0,
+        isBurning: false
+      };
     }
 
     const progress = clamp(
